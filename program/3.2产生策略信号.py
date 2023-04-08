@@ -91,5 +91,5 @@ df['signal'] = temp['signal']
 df.drop(['median', 'std', 'upper', 'lower', 'signal_long', 'signal_short'], axis=1, inplace=True)
 
 # =====将数据存入hdf文件中
-df.to_hdf('/Users/xingbuxingx/Desktop/数字货币量化课程/2020版数字货币量化投资课程/xbx_coin_2020/data/signals.h5', key='df', mode='w')
+df.to_hdf('../data/signals.h5', key='df', mode='w')
 
