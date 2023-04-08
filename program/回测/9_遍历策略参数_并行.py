@@ -6,13 +6,19 @@
 本程序作者: 邢不行
 
 # 课程内容
-遍历参数，查看每个参数的结果
+并行遍历参数，查看每个参数的结果
 """
+
+
 import pandas as pd
 from datetime import timedelta
+from multiprocessing.pool import Pool
+from datetime import datetime
 from Signals import *
 from Position import *
 from Evaluate import *
+
+
 pd.set_option('expand_frame_repr', False)  # 当列太多时不换行
 
 
@@ -31,7 +37,6 @@ drop_days = 10  # 币种刚刚上线10天内不交易
 
 # =====读入数据
 df = pd.read_hdf('../data/%s.h5' % symbol, key='df')
-exit()
 # 任何原始数据读入都进行一下排序、去重，以防万一
 df.sort_values(by=['candle_begin_time'], inplace=True)
 df.drop_duplicates(subset=['candle_begin_time'], inplace=True)
@@ -60,9 +65,9 @@ df.reset_index(inplace=True, drop=True)
 para_list = signal_simple_bolling_para_list()
 
 
-# =====遍历参数
-rtn = pd.DataFrame()
-for para in para_list:
+# =====单次循环
+
+def calculate_by_one_loop(para):
     _df = df.copy()
     # 计算交易信号
     _df = signal_simple_bolling(_df, para=para)
@@ -76,10 +81,26 @@ for para in para_list:
     _df = equity_curve_for_OKEx_USDT_future_next_open(_df, slippage=slippage, c_rate=c_rate, leverage_rate=leverage_rate,
                                                       face_value=face_value, min_margin_ratio=min_margin_ratio)
     # 计算收益
+    rtn = pd.DataFrame()
+    rtn.loc[0, 'para'] = str(para)
     r = _df.iloc[-1]['equity_curve']
+    rtn.loc[0, 'equity_curve'] = r
     print(para, '策略最终收益：', r)
-    rtn.loc[str(para), 'equity_curve'] = r
+    return rtn
 
-# =====输出
-rtn.sort_values(by='equity_curve', ascending=False, inplace=True)
-print(rtn)
+
+# =====并行提速
+if __name__ == '__main__':
+    start_time = datetime.now()  # 标记开始时间
+    with Pool(processes=2) as pool:  # or whatever your hardware can support
+
+        # 使用并行批量获得data frame的一个列表
+        df_list = pool.map(calculate_by_one_loop, para_list)
+        print('读入完成, 开始合并', datetime.now() - start_time)
+        # 合并为一个大的DataFrame
+        para_curve_df = pd.concat(df_list, ignore_index=True)
+
+
+    # =====输出
+    para_curve_df.sort_values(by='equity_curve', ascending=False, inplace=True)
+    print(para_curve_df)
